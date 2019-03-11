@@ -34,51 +34,78 @@ void error(char *msg)
 
 int main(int argc, char *argv[])
 {
-     int sockfd, newsockfd, portno;
-     socklen_t clilen;
-     char buffer[256];
-     struct sockaddr_in serv_addr, cli_addr;
-     int n, count;
-     if (argc < 2) {
-         fprintf(stderr,"WARNING, no port provided, using default port: %d\n", DEFAULT_PORT_NO);
-         portno = DEFAULT_PORT_NO;
-     }
-     else {
-         portno = atoi(argv[1]);
-     }
-     sockfd = socket(AF_INET, SOCK_STREAM, 0);
-     if (sockfd < 0) 
+    int sockfd, newsockfd, portno;
+    socklen_t clilen;
+    struct sockaddr_in serv_addr, cli_addr;
+    int n, count;
+    
+    if (argc < 2) {
+        fprintf(stderr,"WARNING, no port provided, using default port: %d\n", DEFAULT_PORT_NO);
+        portno = DEFAULT_PORT_NO;
+    }
+    else {
+        portno = atoi(argv[1]);
+    }
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
         error("ERROR opening socket");
-     // setsockopt: Handy debugging trick that lets us rerun the server immediately after we kill it; 
-     //   // otherwise we have to wait about 20 secs. Eliminates "ERROR on binding: Address already in use" error. 
-     //
-     int optval = 1; /* flag value for setsockopt */
-     setsockopt( sockfd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval , sizeof(int));
-     bzero((char *) &serv_addr, sizeof(serv_addr));
-     serv_addr.sin_family = AF_INET;
-     serv_addr.sin_addr.s_addr = INADDR_ANY;
-     serv_addr.sin_port = htons(portno);
-     if (bind(sockfd, (struct sockaddr *) &serv_addr,
-              sizeof(serv_addr)) < 0) 
-              error("ERROR on binding");
-     listen(sockfd,5);
-     printf("Listening...\n");
-     fflush( stdout );
-     clilen = sizeof(cli_addr);
-     newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-     if (newsockfd < 0) 
-          error("ERROR on accept");
-     printf("Accepted!\n");
-     fflush( stdout );
-     bzero(buffer,256);
-     count = 1;
-     while (1) {
-	 printf("Write CAN data %d\n", count);
-         fflush( stdout );
-         n = write(newsockfd,"\x44\x33\x22\x11\x80\x0c\x00\x00\x04\xb0",10);
-         if (n < 0) error("ERROR writing to socket");
-	 sleep_ms(500);
-	 ++count;
-     }
-     return 0; 
+    }
+    // setsockopt: Handy debugging trick that lets us rerun the server immediately after we kill it;
+    //   // otherwise we have to wait about 20 secs. Eliminates "ERROR on binding: Address already in use" error.
+    //
+    int optval = 1; /* flag value for setsockopt */
+    setsockopt( sockfd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval , sizeof(int));
+    bzero((char *) &serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(portno);
+    if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+        error("ERROR on binding");
+    }
+    listen(sockfd,5);
+    printf("Listening...\n");
+    fflush( stdout );
+    clilen = sizeof(cli_addr);
+    newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+    if (newsockfd < 0) {
+        error("ERROR on accept");
+    }
+    printf("Accepted!\n");
+    fflush( stdout );
+    count = 1;
+
+    // Consts for now
+    uint16_t rpm = 3500;
+    uint16_t speedMph = 120;
+    uint16_t fuelPercent = 50;
+
+    while (1) {
+        printf("Write CAN data %d\n", count);
+        fflush( stdout );
+        // Write sync marker and frame id to socket
+        n = write(newsockfd,"\x44\x33\x22\x11"  // sync marker
+                            "\x80\x0c\x00\x00"  // frame id (3200)
+                            ,8);                // num bytes to write
+        if (n < 0) {
+            error("ERROR writing sync marker and frame id to socket");
+        }
+        // Build CAN frame data
+        char canFrame[6]= {0};
+        // RPM
+        canFrame[0] = (rpm & 0xff00) >> 8;
+        canFrame[1] = rpm & 0x00ff;
+        // Speed - MPH
+        canFrame[2] = (speedMph & 0xff00) >> 8;
+        canFrame[3] = speedMph & 0x00ff;
+        // Fuel - %
+        canFrame[4] = (fuelPercent & 0xff00) >> 8;
+        canFrame[5] = fuelPercent & 0x00ff;
+        n = write(newsockfd,canFrame,sizeof(canFrame));
+        if (n < 0) {
+            error("ERROR writing CAN frame to socket");
+        }
+        sleep_ms(500);
+        ++count;
+    }
+    return 0;
 }

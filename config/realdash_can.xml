@@ -23,8 +23,15 @@ Requires RealDash version 1.3.0 or newer
                       conversion="V/10" - result is incoming value / 10
                       conversion="B0+15*(B1-43)" - result is 'first byte + 15 * (second byte - 43) -->
 
-      <!-- 1st CAN frame, RPM -->
-      <value targetId="37" units="RPM" offset="0" length="2"></value>
+      <!-- 1st CAN frame -->
+      <!-- RPM -->
+      <value targetId="37"	units="RPM" offset="0" length="2"></value>
+      <!-- Speed -->
+      <value targetId="136"	units="mph" offset="2" length="2"></value>
+      <!-- Fuel -->
+      <value targetId="170" units="%" offset="4" length="2"></value>
+      <!-- Selected Gear -->
+      <!-- <value targetId="140" offset="6" length="1"></value> -->
     </frame>
   </frames>
 </RealDashCAN>
