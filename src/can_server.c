@@ -6,6 +6,7 @@
 #include <sys/types.h> 
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #if _POSIX_C_SOURCE >= 199309L
 #include <time.h>   // for nanosleep
 #else
@@ -65,17 +66,14 @@ int main(int argc, char *argv[])
     }
     listen(sockfd,5);
     while (1) {
-        printf("Listening...\n");
-        fflush( stdout );
+        printf("Listening for incoming RealDash CAN connections...\n");
         clilen = sizeof(cli_addr);
         newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
         if (newsockfd < 0) {
             printf("ERROR on accept\n");
-            fflush( stdout );
             break;
         }
-        printf("Accepted!\n");
-        fflush( stdout );
+        printf("Accepted conection from %s\n", inet_ntoa(cli_addr.sin_addr));
         count = 1;
         
         // Consts for now
@@ -86,14 +84,12 @@ int main(int argc, char *argv[])
         
         while (1) {
             printf("Write CAN data %d\n", count);
-            fflush( stdout );
             // Write sync marker and frame id to socket
             n = write(newsockfd,"\x44\x33\x22\x11"  // sync marker
                       "\x80\x0c\x00\x00"  // frame id (3200)
                       ,8);                // num bytes to write
             if (n < 0) {
                 printf("ERROR writing sync marker and frame id to socket\n");
-                fflush( stdout );
                 break;
             }
             // Build CAN frame data
@@ -112,12 +108,18 @@ int main(int argc, char *argv[])
             n = write(newsockfd,canFrame,sizeof(canFrame));
             if (n < 0) {
                 printf("ERROR writing CAN frame to socket\n");
-                fflush( stdout );
                 break;
             }
+            fflush( stdout );
             sleep_ms(500);
             ++count;
         }
+        printf("Connection from %s closed\n", inet_ntoa(cli_addr.sin_addr));
+        fflush( stdout );
+        close(newsockfd);
     }
+    printf("Listening socket closed\n");
+    fflush( stdout );
+    close(sockfd);
     return 0;
 }
