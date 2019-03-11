@@ -46,6 +46,7 @@ int main(int argc, char *argv[])
     else {
         portno = atoi(argv[1]);
     }
+    signal(SIGPIPE, SIG_IGN);   // Don't crash on SIGPIPE
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
         error("ERROR opening socket");
@@ -63,49 +64,60 @@ int main(int argc, char *argv[])
         error("ERROR on binding");
     }
     listen(sockfd,5);
-    printf("Listening...\n");
-    fflush( stdout );
-    clilen = sizeof(cli_addr);
-    newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-    if (newsockfd < 0) {
-        error("ERROR on accept");
-    }
-    printf("Accepted!\n");
-    fflush( stdout );
-    count = 1;
-
-    // Consts for now
-    uint16_t rpm = 3500;
-    uint16_t speedMph = 120;
-    uint16_t fuelPercent = 50;
-
     while (1) {
-        printf("Write CAN data %d\n", count);
+        printf("Listening...\n");
         fflush( stdout );
-        // Write sync marker and frame id to socket
-        n = write(newsockfd,"\x44\x33\x22\x11"  // sync marker
-                            "\x80\x0c\x00\x00"  // frame id (3200)
-                            ,8);                // num bytes to write
-        if (n < 0) {
-            error("ERROR writing sync marker and frame id to socket");
+        clilen = sizeof(cli_addr);
+        newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+        if (newsockfd < 0) {
+            printf("ERROR on accept\n");
+            fflush( stdout );
+            break;
         }
-        // Build CAN frame data
-        char canFrame[6]= {0};
-        // RPM
-        canFrame[0] = (rpm & 0xff00) >> 8;
-        canFrame[1] = rpm & 0x00ff;
-        // Speed - MPH
-        canFrame[2] = (speedMph & 0xff00) >> 8;
-        canFrame[3] = speedMph & 0x00ff;
-        // Fuel - %
-        canFrame[4] = (fuelPercent & 0xff00) >> 8;
-        canFrame[5] = fuelPercent & 0x00ff;
-        n = write(newsockfd,canFrame,sizeof(canFrame));
-        if (n < 0) {
-            error("ERROR writing CAN frame to socket");
+        printf("Accepted!\n");
+        fflush( stdout );
+        count = 1;
+        
+        // Consts for now
+        uint16_t rpm = 3500;
+        uint16_t speedMph = 120;
+        uint16_t fuelPercent = 25;
+        char gear = 0;
+        
+        while (1) {
+            printf("Write CAN data %d\n", count);
+            fflush( stdout );
+            // Write sync marker and frame id to socket
+            n = write(newsockfd,"\x44\x33\x22\x11"  // sync marker
+                      "\x80\x0c\x00\x00"  // frame id (3200)
+                      ,8);                // num bytes to write
+            if (n < 0) {
+                printf("ERROR writing sync marker and frame id to socket\n");
+                fflush( stdout );
+                break;
+            }
+            // Build CAN frame data
+            char canFrame[7]= {0};
+            // RPM
+            canFrame[0] = (rpm & 0xff00) >> 8;
+            canFrame[1] = rpm & 0x00ff;
+            // Speed - MPH
+            canFrame[2] = (speedMph & 0xff00) >> 8;
+            canFrame[3] = speedMph & 0x00ff;
+            // Fuel - %
+            canFrame[4] = (fuelPercent & 0xff00) >> 8;
+            canFrame[5] = fuelPercent & 0x00ff;
+            canFrame[6] = gear;
+            // Write CAN frame to socket
+            n = write(newsockfd,canFrame,sizeof(canFrame));
+            if (n < 0) {
+                printf("ERROR writing CAN frame to socket\n");
+                fflush( stdout );
+                break;
+            }
+            sleep_ms(500);
+            ++count;
         }
-        sleep_ms(500);
-        ++count;
     }
     return 0;
 }
