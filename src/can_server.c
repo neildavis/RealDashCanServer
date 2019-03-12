@@ -85,9 +85,10 @@ int main(int argc, char *argv[])
         while (1) {
             printf("Write CAN data %d\n", count);
             // Write sync marker and frame id to socket
-            n = write(newsockfd,"\x44\x33\x22\x11"  // sync marker
-                      "\x80\x0c\x00\x00"  // frame id (3200)
-                      ,8);                // num bytes to write
+            n = send(newsockfd, "\x44\x33\x22\x11"  // sync marker
+                                "\x80\x0c\x00\x00", // frame id (3200)
+                                8,                  // num bytes to write
+                                0);                 // flags (MSG_NOSIGNAL is not portable!)
             if (n < 0) {
                 printf("ERROR writing sync marker and frame id to socket\n");
                 break;
@@ -105,7 +106,7 @@ int main(int argc, char *argv[])
             canFrame[5] = fuelPercent & 0x00ff;
             canFrame[6] = gear;
             // Write CAN frame to socket
-            n = write(newsockfd,canFrame,sizeof(canFrame));
+            n = send(newsockfd,canFrame,sizeof(canFrame), 0);
             if (n < 0) {
                 printf("ERROR writing CAN frame to socket\n");
                 break;
